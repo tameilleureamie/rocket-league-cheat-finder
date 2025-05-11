@@ -13,27 +13,24 @@ cd "$REPO_DIR/backend"
 
 # --- Dockerfile ---
 cat <<EOF > Dockerfile
-FROM python:3.10-slim
+FROM python:3.8
 
 WORKDIR /app
 
-COPY requirements.txt ./
-RUN apt-get update && apt-get install -y build-essential && \
-    pip install --upgrade pip && \
-    pip install -r requirements.txt
+COPY backend/requirements.txt ./
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
-COPY . .
+COPY backend/ .
 
-CMD ["python", "main.py"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 EOF
 
 # --- backend code ---
 cat <<EOF > main.py
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import shutil, os
 from carball.analysis.analysis_manager import AnalysisManager
-import uvicorn
 
 app = FastAPI()
 
@@ -50,25 +47,37 @@ async def analyze_replay(replay: UploadFile = File(...), player: str = Form(...)
     with open(file_location, "wb") as f:
         shutil.copyfileobj(replay.file, f)
 
-    manager = AnalysisManager(file_location)
-    proto = manager.get_protobuf_data()
-    df = manager.get_data_frame()
+    try:
+        manager = AnalysisManager(file_location)
+        proto_data = manager.get_protobuf_data()
+        df = manager.get_data_frame()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur d'analyse du fichier: {str(e)}")
 
-    touches = df['ball']['player_hits'][player].shape[0] if player in df['ball']['player_hits'] else 0
+    if not df or 'ball' not in df or 'player_hits' not in df['ball']:
+        raise HTTPException(status_code=500, detail="Structure du fichier non conforme ou vide.")
+
+    if player not in df['ball']['player_hits']:
+        available_players = list(df['ball']['player_hits'].keys())
+        raise HTTPException(
+            status_code=404,
+            detail=f"Joueur '{player}' introuvable. Joueurs disponibles : {available_players}"
+        )
+
+    touches = df['ball']['player_hits'][player].shape[0]
     bot_score = 100 if touches > 50 else 20
     result = "bot" if bot_score > 80 else "human" if bot_score < 40 else "suspect"
     return {"score": bot_score, "result": result}
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
 EOF
 
 cat <<EOF > requirements.txt
-fastapi
-uvicorn
-python-multipart
-carball
+numpy==1.18.2
+pandas==1.0.3
+protobuf==3.6.1
+fastapi==0.95.2
+uvicorn==0.22.0
+python-multipart==0.0.6
+carball==0.7.5
 EOF
 
 cd ../..
