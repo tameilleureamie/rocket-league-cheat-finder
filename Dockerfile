@@ -1,4 +1,4 @@
-FROM python:3.10
+FROM python:3.8
 
 WORKDIR /app
 
@@ -8,4 +8,3 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 COPY backend/ .
 
 CMD ["python", "main.py"]
-
