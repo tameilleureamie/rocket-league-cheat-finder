@@ -1,4 +1,7 @@
-fastapi
-uvicorn
-python-multipart
-carball
+fastapi==0.115.2
+uvicorn==0.34.0
+python-multipart==0.0.6
+carball==0.7.5
+pandas==1.0.3
+numpy==1.18.5
+protobuf==3.20.3
