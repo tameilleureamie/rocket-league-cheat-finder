@@ -1,7 +1,7 @@
 numpy==1.18.5
 pandas==1.0.3
 protobuf==3.20.3
-fastapi==0.115.2
-uvicorn==0.34.0
+fastapi==0.95.2
+uvicorn==0.22.0
 python-multipart==0.0.6
 carball==0.7.5
