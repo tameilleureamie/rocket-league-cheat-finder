@@ -27,8 +27,9 @@ EOF
 
 # --- backend code ---
 cat <<EOF > main.py
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import shutil, os
 from carball.analysis.analysis_manager import AnalysisManager
 
@@ -40,6 +41,22 @@ app.add_middleware(
     allow_methods=["*"], allow_headers=["*"],
 )
 
+@app.post("/players")
+async def list_players(replay: UploadFile = File(...)):
+    file_location = f"./temp/{replay.filename}"
+    os.makedirs("./temp", exist_ok=True)
+    with open(file_location, "wb") as f:
+        shutil.copyfileobj(replay.file, f)
+
+    try:
+        manager = AnalysisManager(file_location)
+        df = manager.get_data_frame()
+        players = list(df['ball']['player_hits'].keys())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur d'analyse du fichier: {str(e)}")
+
+    return {"players": players}
+
 @app.post("/analyze")
 async def analyze_replay(replay: UploadFile = File(...), player: str = Form(...)):
     file_location = f"./temp/{replay.filename}"
@@ -49,7 +66,6 @@ async def analyze_replay(replay: UploadFile = File(...), player: str = Form(...)
 
     try:
         manager = AnalysisManager(file_location)
-        proto_data = manager.get_protobuf_data()
         df = manager.get_data_frame()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur d'analyse du fichier: {str(e)}")
@@ -87,3 +103,4 @@ echo "cd \$HOME/$PROJECT_NAME/backend"
 echo "docker build -t rocket-backend ."
 echo "docker run -p 8000:8000 rocket-backend"
 echo "➡️ API disponible sur http://localhost:8000/analyze"
+echo "➡️ Endpoint pour obtenir les joueurs : http://localhost:8000/players"
