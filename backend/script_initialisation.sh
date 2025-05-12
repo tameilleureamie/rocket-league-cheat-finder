@@ -96,6 +96,27 @@ python-multipart==0.0.6
 carball==0.7.5
 EOF
 
+# --- script test simplifié sans jq ---
+cat <<EOF > test_cheat_finder.sh
+#!/bin/bash
+
+REPLAY_FILE="D0B43FC942ED582418ADFC846A8C9E19.replay"
+BACKEND_URL="https://rocket-league-cheat-finder.onrender.com"
+
+echo "📤 Upload du fichier..."
+response=$(curl -s -X POST "$BACKEND_URL/upload" \
+  -F "replay=@\$REPLAY_FILE")
+
+echo "📦 Réponse :"
+echo "\$response"
+
+echo "📝 Copie manuelle du session_id et du nom du joueur pour l'analyse"
+echo "Utilise ensuite cette commande :"
+echo "curl -X POST \$BACKEND_URL/analyze -F 'session_id=TON_SESSION_ID' -F 'player=TON_JOUEUR'"
+EOF
+
+chmod +x test_cheat_finder.sh
+
 cd ../..
 
 echo "✅ Backend Docker prêt. Tu peux maintenant le lancer avec :"
@@ -104,3 +125,4 @@ echo "docker build -t rocket-backend ."
 echo "docker run -p 8000:8000 rocket-backend"
 echo "➡️ POST /upload : envoie le .replay et reçois session_id + joueurs"
 echo "➡️ POST /analyze : envoie session_id + joueur pour analyser"
+echo "🧪 Pour tester rapidement : ./backend/test_cheat_finder.sh"
