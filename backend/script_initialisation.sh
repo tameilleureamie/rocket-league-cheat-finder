@@ -17,10 +17,10 @@ FROM python:3.8
 
 WORKDIR /app
 
-COPY backend/requirements.txt ./
+COPY requirements.txt ./
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-COPY backend/ .
+COPY . .
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 EOF
@@ -29,7 +29,6 @@ EOF
 cat <<EOF > main.py
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 import shutil, os, uuid
 from carball.analysis.analysis_manager import AnalysisManager
 
