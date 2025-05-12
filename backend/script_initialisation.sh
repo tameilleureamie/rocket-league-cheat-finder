@@ -30,7 +30,7 @@ cat <<EOF > main.py
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-import shutil, os
+import shutil, os, uuid
 from carball.analysis.analysis_manager import AnalysisManager
 
 app = FastAPI()
@@ -41,9 +41,12 @@ app.add_middleware(
     allow_methods=["*"], allow_headers=["*"],
 )
 
-@app.post("/players")
-async def list_players(replay: UploadFile = File(...)):
-    file_location = f"./temp/{replay.filename}"
+SESSIONS = {}
+
+@app.post("/upload")
+async def upload_replay(replay: UploadFile = File(...)):
+    session_id = str(uuid.uuid4())
+    file_location = f"./temp/{session_id}_{replay.filename}"
     os.makedirs("./temp", exist_ok=True)
     with open(file_location, "wb") as f:
         shutil.copyfileobj(replay.file, f)
@@ -52,17 +55,19 @@ async def list_players(replay: UploadFile = File(...)):
         manager = AnalysisManager(file_location)
         df = manager.get_data_frame()
         players = list(df['ball']['player_hits'].keys())
+        SESSIONS[session_id] = {"file": file_location, "players": players}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur d'analyse du fichier: {str(e)}")
 
-    return {"players": players}
+    return {"session_id": session_id, "players": players}
 
 @app.post("/analyze")
-async def analyze_replay(replay: UploadFile = File(...), player: str = Form(...)):
-    file_location = f"./temp/{replay.filename}"
-    os.makedirs("./temp", exist_ok=True)
-    with open(file_location, "wb") as f:
-        shutil.copyfileobj(replay.file, f)
+async def analyze_player(session_id: str = Form(...), player: str = Form(...)):
+    session = SESSIONS.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session non trouvée. Veuillez téléverser un replay d'abord.")
+
+    file_location = session["file"]
 
     try:
         manager = AnalysisManager(file_location)
@@ -70,15 +75,8 @@ async def analyze_replay(replay: UploadFile = File(...), player: str = Form(...)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur d'analyse du fichier: {str(e)}")
 
-    if not df or 'ball' not in df or 'player_hits' not in df['ball']:
-        raise HTTPException(status_code=500, detail="Structure du fichier non conforme ou vide.")
-
     if player not in df['ball']['player_hits']:
-        available_players = list(df['ball']['player_hits'].keys())
-        raise HTTPException(
-            status_code=404,
-            detail=f"Joueur '{player}' introuvable. Joueurs disponibles : {available_players}"
-        )
+        raise HTTPException(status_code=404, detail="Joueur introuvable dans ce replay.")
 
     touches = df['ball']['player_hits'][player].shape[0]
     bot_score = 100 if touches > 50 else 20
@@ -102,5 +100,5 @@ echo "✅ Backend Docker prêt. Tu peux maintenant le lancer avec :"
 echo "cd \$HOME/$PROJECT_NAME/backend"
 echo "docker build -t rocket-backend ."
 echo "docker run -p 8000:8000 rocket-backend"
-echo "➡️ API disponible sur http://localhost:8000/analyze"
-echo "➡️ Endpoint pour obtenir les joueurs : http://localhost:8000/players"
+echo ➡️ POST /upload : envoie le .replay et reçois session_id + joueurs"
+echo "➡️ POST /analyze : envoie session_id + joueur pour analyser"
