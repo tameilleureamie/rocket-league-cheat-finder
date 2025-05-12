@@ -65,9 +65,11 @@ async def upload_replay(replay: UploadFile = File(...)):
 async def analyze_player(session_id: str = Form(...), player: str = Form(...)):
     session = SESSIONS.get(session_id)
     if not session:
-        raise HTTPException(status_code=404, detail="Session non trouvée. Veuillez téléverser un replay d'abord.")
+        raise HTTPException(status_code=404, detail="Session non trouvée. Veuillez d'abord téléverser un fichier via /upload.")
 
-    file_location = session["file"]
+    file_location = session.get("file")
+    if not file_location or not os.path.exists(file_location):
+        raise HTTPException(status_code=500, detail="Fichier replay introuvable sur le serveur. La session est peut-être expirée.")
 
     try:
         manager = AnalysisManager(file_location)
@@ -100,5 +102,5 @@ echo "✅ Backend Docker prêt. Tu peux maintenant le lancer avec :"
 echo "cd \$HOME/$PROJECT_NAME/backend"
 echo "docker build -t rocket-backend ."
 echo "docker run -p 8000:8000 rocket-backend"
-echo ➡️ POST /upload : envoie le .replay et reçois session_id + joueurs"
+echo "➡️ POST /upload : envoie le .replay et reçois session_id + joueurs"
 echo "➡️ POST /analyze : envoie session_id + joueur pour analyser"
